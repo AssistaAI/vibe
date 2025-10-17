@@ -207,11 +207,16 @@ export async function buildGatewayUrl(env: Env, providerOverride?: AIGatewayProv
             console.warn(`Invalid CLOUDFLARE_AI_GATEWAY_URL provided: ${env.CLOUDFLARE_AI_GATEWAY_URL}. Falling back to AI bindings.`);
         }
     }
-    
-    // Build the url via bindings
-    const gateway = env.AI.gateway(env.CLOUDFLARE_AI_GATEWAY);
-    const baseUrl = providerOverride ? await gateway.getUrl(providerOverride) : `${await gateway.getUrl()}compat`;
-    return baseUrl;
+
+    // Build the url via bindings (only if gateway is configured)
+    if (env.CLOUDFLARE_AI_GATEWAY && env.CLOUDFLARE_AI_GATEWAY.trim() !== '') {
+        const gateway = env.AI.gateway(env.CLOUDFLARE_AI_GATEWAY);
+        const baseUrl = providerOverride ? await gateway.getUrl(providerOverride) : `${await gateway.getUrl()}compat`;
+        return baseUrl;
+    }
+
+    // No gateway configured - return empty string to use direct API calls
+    return '';
 }
 
 function isValidApiKey(apiKey: string): boolean {
@@ -286,10 +291,19 @@ export async function getConfigurationForModel(
         providerForcedOverride = provider as AIGatewayProviders;
     }
 
-    const baseURL = await buildGatewayUrl(env, providerForcedOverride);
-
     // Extract the provider name from model name. Model name is of type `provider/model_name`
     const provider = providerForcedOverride || model.split('/')[0];
+
+    // Check if this is a direct provider call (google-ai-studio without gateway)
+    if (provider === 'google-ai-studio') {
+        return {
+            baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+            apiKey: env.GOOGLE_AI_STUDIO_API_KEY,
+        };
+    }
+
+    const baseURL = await buildGatewayUrl(env, providerForcedOverride);
+
     // Try to find API key of type <PROVIDER>_API_KEY else default to CLOUDFLARE_AI_GATEWAY_TOKEN
     // `env` is an interface of type `Env`
     const apiKey = await getApiKey(provider, env, userId);
@@ -473,6 +487,10 @@ export async function infer<OutputSchema extends z.AnyZodObject>({
         modelName = modelName.replace(/\[.*?\]/, '');
 
         const client = new OpenAI({ apiKey, baseURL: baseURL, defaultHeaders });
+
+        // Strip provider prefix from model name (e.g., "google-ai-studio/model" -> "model")
+        const modelNameWithoutProvider = modelName.includes('/') ? modelName.split('/')[1] : modelName;
+
         const schemaObj =
             schema && schemaName && !format
                 ? { response_format: zodResponseFormat(schema, schemaName) }
@@ -538,7 +556,7 @@ export async function infer<OutputSchema extends z.AnyZodObject>({
             }
         }
 
-        console.log(`Running inference with ${modelName} using structured output with ${format} format, reasoning effort: ${reasoning_effort}, max tokens: ${maxTokens}, temperature: ${temperature}, baseURL: ${baseURL}`);
+        console.log(`Running inference with ${modelName} (stripped: ${modelNameWithoutProvider}) using structured output with ${format} format, reasoning effort: ${reasoning_effort}, max tokens: ${maxTokens}, temperature: ${temperature}, baseURL: ${baseURL}`);
 
         const toolsOpts = tools ? { tools, tool_choice: 'auto' as const } : {};
         let response: OpenAI.ChatCompletion | OpenAI.ChatCompletionChunk | Stream<OpenAI.ChatCompletionChunk>;
@@ -548,7 +566,7 @@ export async function infer<OutputSchema extends z.AnyZodObject>({
                 ...schemaObj,
                 ...extraBody,
                 ...toolsOpts,
-                model: modelName,
+                model: modelNameWithoutProvider,
                 messages: messagesToPass as OpenAI.ChatCompletionMessageParam[],
                 max_completion_tokens: maxTokens || 150000,
                 stream: stream ? true : false,

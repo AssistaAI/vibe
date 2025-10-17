@@ -8,6 +8,7 @@ export function setupStatusRoutes(app: Hono<AppEnv>): void {
     const statusRouter = new Hono<AppEnv>();
 
     statusRouter.get('/', setAuthLevel(AuthConfig.public), adaptController(StatusController, StatusController.getPlatformStatus));
+    statusRouter.get('/health', setAuthLevel(AuthConfig.public), adaptController(StatusController, StatusController.getHealthCheck));
 
     app.route('/api/status', statusRouter);
 }

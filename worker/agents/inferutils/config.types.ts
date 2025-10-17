@@ -12,7 +12,7 @@ export enum AIModels {
 	GEMINI_2_0_FLASH = 'google-ai-studio/gemini-2.0-flash',
 	GEMINI_2_5_PRO = 'google-ai-studio/gemini-2.5-pro',
 	GEMINI_2_5_FLASH = 'google-ai-studio/gemini-2.5-flash',
-	GEMINI_2_5_FLASH_LITE = 'google-ai-studio/gemini-2.5-flash-lite',
+	GEMINI_2_5_FLASH_LITE = 'google-ai-studio/gemini-2.5-flash-lite-preview-06-17',
 
 	GEMINI_1_5_FLASH_8B = 'google-ai-studio/gemini-1.5-flash-8b-latest',
     GEMINI_2_5_FLASH_LATEST = 'google-ai-studio/gemini-2.5-flash-latest',
